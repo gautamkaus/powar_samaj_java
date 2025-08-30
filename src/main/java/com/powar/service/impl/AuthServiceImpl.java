@@ -32,8 +32,8 @@ public class AuthServiceImpl implements AuthService {
     private Long jwtExpiration;
     
     private final PasswordEncoder passwordEncoder;
-    private final SecretKey secretKey;
-    
+//    private final SecretKey secretKey;
+
     // In-memory storage for demo purposes (in production, use Redis or database)
     private final Map<String, String> userCredentials = new ConcurrentHashMap<>();
     private final Map<String, String> refreshTokens = new ConcurrentHashMap<>();
@@ -41,7 +41,7 @@ public class AuthServiceImpl implements AuthService {
     
     public AuthServiceImpl(PasswordEncoder passwordEncoder) {
         this.passwordEncoder = passwordEncoder;
-        this.secretKey = Keys.hmacShaKeyFor(jwtSecret.getBytes());
+//        this.secretKey = jwtSecret;
         
         // Initialize with some demo users
         initializeDemoUsers();
@@ -168,7 +168,7 @@ public class AuthServiceImpl implements AuthService {
             
             // Extract username from token and remove refresh token
             Claims claims = Jwts.parserBuilder()
-                    .setSigningKey(secretKey)
+                    .setSigningKey(jwtSecret)
                     .build()
                     .parseClaimsJws(token)
                     .getBody();
@@ -196,7 +196,7 @@ public class AuthServiceImpl implements AuthService {
             
             // Validate JWT token
             Claims claims = Jwts.parserBuilder()
-                    .setSigningKey(secretKey)
+                    .setSigningKey(jwtSecret)
                     .build()
                     .parseClaimsJws(token)
                     .getBody();
@@ -221,7 +221,7 @@ public class AuthServiceImpl implements AuthService {
                 .setSubject(userInfo.getUsername())
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + jwtExpiration))
-                .signWith(secretKey, SignatureAlgorithm.HS512)
+                .signWith(SignatureAlgorithm.HS512, jwtSecret)
                 .compact();
     }
     
@@ -230,7 +230,7 @@ public class AuthServiceImpl implements AuthService {
                 .setSubject(userInfo.getUsername())
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + (jwtExpiration * 7))) // 7 times longer
-                .signWith(secretKey, SignatureAlgorithm.HS512)
+                .signWith(SignatureAlgorithm.HS512, jwtSecret)
                 .compact();
     }
     

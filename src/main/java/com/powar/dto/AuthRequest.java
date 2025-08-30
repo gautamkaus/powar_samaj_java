@@ -2,7 +2,11 @@ package com.powar.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import lombok.Getter;
+import lombok.Setter;
 
+@Getter
+@Setter
 public class AuthRequest {
     
     @NotBlank(message = "Email is required")
@@ -11,7 +15,26 @@ public class AuthRequest {
     
     @NotBlank(message = "Password is required")
     private String password_hash;
-    
+    private String username;
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    private String password;
+
     // Default constructor
     public AuthRequest() {}
     

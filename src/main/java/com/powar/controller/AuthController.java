@@ -4,13 +4,14 @@ import com.powar.dto.AuthRequest;
 import com.powar.dto.AuthResponse;
 import com.powar.dto.RegisterRequest;
 import com.powar.service.AuthService;
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import javax.validation.Valid;
+;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -63,7 +64,7 @@ public class AuthController {
      * User registration endpoint
      */
     @PostMapping("/register")
-    public ResponseEntity<Map<String, Object>> register(@Valid @RequestBody RegisterRequest registerRequest) {
+    public ResponseEntity<Map<String, Object>> register(@Valid  @RequestBody RegisterRequest registerRequest) {
         try {
             logger.info("Registration attempt for user: {}", registerRequest.getUsername());
             
@@ -195,5 +196,10 @@ public class AuthController {
             
             return ResponseEntity.badRequest().body(errorResponse);
         }
+    }
+
+    @GetMapping("/success")
+    String test() {
+        return "success";
     }
 }
