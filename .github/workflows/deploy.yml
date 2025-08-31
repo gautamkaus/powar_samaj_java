@@ -1,0 +1,179 @@
+name: Deploy Powar Samaj Java Microservice to AWS EC2 (Free Tier)
+
+# Trigger workflow on push to main branch
+on:
+  push:
+    branches: [ dev ]
+  pull_request:
+    branches: [ dev ]
+
+# Environment variables
+env:
+  AWS_REGION: us-east-1  # Free tier region
+  DOCKER_IMAGE: powar-samaj-java
+  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+
+jobs:
+  # Build and Test Job
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Cache Maven packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      - name: Build with Maven
+        run: |
+          cd powar_samaj_java
+          mvn clean package -DskipTests
+
+      - name: Run tests (optional)
+        run: |
+          cd powar_samaj_java
+          mvn test
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: java-app
+          path: powar_samaj_java/target/*.jar
+
+  # Build and Push Docker Image to Docker Hub
+  build-and-push:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push Docker image
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          cd powar_samaj_java
+          docker build -t ${{ env.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE }}:$IMAGE_TAG .
+          docker build -t ${{ env.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE }}:latest .
+          docker push ${{ env.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE }}:$IMAGE_TAG
+          docker push ${{ env.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE }}:latest
+          echo "image=${{ env.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE }}:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+  # Deploy to EC2 (Free Tier Optimized)
+  deploy-to-ec2:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    
+    steps:
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Update system packages (minimal for free tier)
+            sudo apt-get update -qq
+            
+            # Install Docker if not installed (lightweight installation)
+            if ! command -v docker &> /dev/null; then
+              echo "Installing Docker..."
+              curl -fsSL https://get.docker.com -o get-docker.sh
+              sudo sh get-docker.sh --mirror Aliyun
+              sudo usermod -aG docker $USER
+              sudo systemctl enable docker
+              sudo systemctl start docker
+            fi
+            
+            # Create deployment directory
+            mkdir -p /home/${{ secrets.EC2_USERNAME }}/powar-samaj
+            cd /home/${{ secrets.EC2_USERNAME }}/powar-samaj
+            
+            # Login to Docker Hub (if needed)
+            echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USERNAME }} --password-stdin
+            
+            # Pull latest image
+            docker pull ${{ env.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE }}:latest
+            
+            # Stop existing container
+            docker stop powar-samaj-java || true
+            docker rm powar-samaj-java || true
+            
+            # Clean up old images to save space (free tier optimization)
+            docker image prune -f
+            
+            # Run new container with minimal resource usage
+            docker run -d \
+              --name powar-samaj-java \
+              --restart unless-stopped \
+              -p 8081:8081 \
+              --memory=512m \
+              --cpus=0.5 \
+              -e SPRING_PROFILES_ACTIVE=prod \
+              -e DB_HOST=${{ secrets.DB_HOST }} \
+              -e DB_PORT=${{ secrets.DB_PORT }} \
+              -e DB_NAME=${{ secrets.DB_NAME }} \
+              -e DB_USERNAME=${{ secrets.DB_USERNAME }} \
+              -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
+              -e JWT_SECRET=${{ secrets.JWT_SECRET }} \
+              -e SERVER_PORT=8081 \
+              ${{ env.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE }}:latest
+            
+            # Health check
+            echo "Waiting for application to start..."
+            sleep 15
+            
+            # Check if container is running
+            if docker ps | grep -q powar-samaj-java; then
+              echo "Container is running successfully"
+            
+              # Health check with retry
+              for i in {1..5}; do
+                if curl -f http://localhost:8081/actuator/health > /dev/null 2>&1; then
+                  echo "✅ Application health check passed!"
+                  break
+                else
+                  echo "Health check attempt $i failed, retrying..."
+                  sleep 5
+                fi
+              done
+            
+              # Show container status
+              docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+            else
+              echo "❌ Container failed to start"
+              docker logs powar-samaj-java
+              exit 1
+            fi
+            
+            echo "Deployment completed successfully!"
+
+      - name: Notify deployment status
+        if: always()
+        run: |
+          if [ ${{ job.status }} == 'success' ]; then
+            echo "✅ Deployment to EC2 completed successfully!"
+            echo "Application URL: http://${{ secrets.EC2_HOST }}:8081"
+          else
+            echo "❌ Deployment to EC2 failed!"
+          fi

@@ -1,18 +1,35 @@
-# Java Backend Dockerfile
-FROM openjdk:17-jdk-slim
+# Multi-stage build for Java Backend
+# Stage 1: Build the application
+FROM maven:3.9.5-openjdk-17 AS build
 
+# Set working directory
 WORKDIR /app
 
-# Copy Maven files
-COPY pom.xml ./
+# Copy Maven configuration files
+COPY pom.xml .
 COPY src ./src
 
-# Install Maven and build the application
-RUN apt-get update && apt-get install -y maven
+# Download dependencies and build the application
 RUN mvn clean package -DskipTests
 
+# Stage 2: Runtime stage
+FROM openjdk:17-jre-slim
+
+# Add Maintainer Info
+LABEL maintainer="kaustubh@yugenix.in"
+
+# Set working directory
+WORKDIR /app
+
+# Copy the built JAR from build stage
+COPY --from=build /app/target/powar-java-backend-1.0.0.jar app.jar
+
+# Create non-root user for security
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+USER appuser
+
 # Expose port
-EXPOSE 8080
+EXPOSE 8081
 
 # Run the application
-CMD ["java", "-jar", "target/*.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]
