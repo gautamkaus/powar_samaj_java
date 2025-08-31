@@ -3,24 +3,37 @@ package com.powar.service.impl;
 import com.powar.dto.AuthRequest;
 import com.powar.dto.AuthResponse;
 import com.powar.dto.RegisterRequest;
+import com.powar.entity.User;
+import com.powar.entity.UserProfile;
+import com.powar.entity.MasterState;
+import com.powar.entity.MasterDistrict;
+import com.powar.entity.MasterTahsil;
+import com.powar.entity.MasterProfession;
+import com.powar.repository.UserRepository;
+import com.powar.repository.UserProfileRepository;
+import com.powar.repository.MasterStateRepository;
+import com.powar.repository.MasterDistrictRepository;
+import com.powar.repository.MasterTahsilRepository;
+import com.powar.repository.MasterProfessionRepository;
 import com.powar.service.AuthService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.security.Keys;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import javax.crypto.SecretKey;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
+@Transactional
 public class AuthServiceImpl implements AuthService {
     
     private static final Logger logger = LoggerFactory.getLogger(AuthServiceImpl.class);
@@ -30,21 +43,34 @@ public class AuthServiceImpl implements AuthService {
     
     @Value("${jwt.expiration}")
     private Long jwtExpiration;
-    
-    private final PasswordEncoder passwordEncoder;
-//    private final SecretKey secretKey;
 
-    // In-memory storage for demo purposes (in production, use Redis or database)
-    private final Map<String, String> userCredentials = new ConcurrentHashMap<>();
+    private final PasswordEncoder passwordEncoder;
+    private final UserRepository userRepository;
+    private final UserProfileRepository userProfileRepository;
+    private final MasterStateRepository masterStateRepository;
+    private final MasterDistrictRepository masterDistrictRepository;
+    private final MasterTahsilRepository masterTahsilRepository;
+    private final MasterProfessionRepository masterProfessionRepository;
+
+    // In-memory storage for refresh tokens and blacklisted tokens (in production, use Redis)
     private final Map<String, String> refreshTokens = new ConcurrentHashMap<>();
     private final Map<String, Boolean> blacklistedTokens = new ConcurrentHashMap<>();
     
-    public AuthServiceImpl(PasswordEncoder passwordEncoder) {
+    @Autowired
+    public AuthServiceImpl(PasswordEncoder passwordEncoder,
+                         UserRepository userRepository,
+                         UserProfileRepository userProfileRepository,
+                         MasterStateRepository masterStateRepository,
+                         MasterDistrictRepository masterDistrictRepository,
+                         MasterTahsilRepository masterTahsilRepository,
+                         MasterProfessionRepository masterProfessionRepository) {
         this.passwordEncoder = passwordEncoder;
-//        this.secretKey = jwtSecret;
-        
-        // Initialize with some demo users
-        initializeDemoUsers();
+        this.userRepository = userRepository;
+        this.userProfileRepository = userProfileRepository;
+        this.masterStateRepository = masterStateRepository;
+        this.masterDistrictRepository = masterDistrictRepository;
+        this.masterTahsilRepository = masterTahsilRepository;
+        this.masterProfessionRepository = masterProfessionRepository;
     }
     
     @Override
@@ -52,14 +78,21 @@ public class AuthServiceImpl implements AuthService {
         try {
             logger.info("Processing login for user: {}", authRequest.getUsername());
             
-            // Check if user exists and password matches
-            String storedPassword = userCredentials.get(authRequest.getUsername());
-            if (storedPassword == null || !passwordEncoder.matches(authRequest.getPassword(), storedPassword)) {
+            // Find user by email or mobile number
+            User user = userRepository.findByEmailIdOrMobileNo(authRequest.getUsername())
+                    .orElseThrow(() -> new RuntimeException("Invalid username or password"));
+            
+            // Check if password matches
+            if (!passwordEncoder.matches(authRequest.getPassword(), user.getPasswordHash())) {
                 throw new RuntimeException("Invalid username or password");
             }
             
-            // Create user info (in production, fetch from database)
-            AuthResponse.UserInfo userInfo = createUserInfo(authRequest.getUsername());
+            // Get user profile
+            UserProfile userProfile = userProfileRepository.findByUserId(user.getId())
+                    .orElse(null);
+            
+            // Create user info
+            AuthResponse.UserInfo userInfo = createUserInfo(user, userProfile);
             
             // Generate JWT tokens
             String accessToken = generateAccessToken(userInfo);
@@ -81,32 +114,95 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public AuthResponse register(RegisterRequest registerRequest) {
         try {
-            logger.info("Processing registration for user: {}", registerRequest.getUsername());
+            logger.info("Processing registration for user: {}", registerRequest.getEmail_id());
             
-            // Check if username already exists
-            if (userCredentials.containsKey(registerRequest.getUsername())) {
-                throw new RuntimeException("Username already exists");
+            // Check if user already exists by email or mobile
+            if (userRepository.existsByEmailIdOrMobileNo(registerRequest.getEmail_id()) || 
+                userRepository.existsByEmailIdOrMobileNo(registerRequest.getMobile_no())) {
+                throw new RuntimeException("User already exists with this email or mobile number");
             }
             
-            // Check if email already exists (in production, check database)
-            if (userCredentials.containsValue(registerRequest.getEmail())) {
-                throw new RuntimeException("Email already exists");
+                        // Create and save user
+            User user = new User();
+            user.setEmailId(registerRequest.getEmail_id());
+            user.setMobileNo(registerRequest.getMobile_no());
+            // Handle both password and password_hash fields
+            String password = registerRequest.getPassword_hash();
+            if (password == null || password.trim().isEmpty()) {
+                throw new RuntimeException("Password is required");
+            }
+            user.setPasswordHash(passwordEncoder.encode(password));
+            user.setRole(User.UserRole.USER);
+            
+            logger.info("Attempting to save user with email: {}", registerRequest.getEmail_id());
+            user = userRepository.save(user);
+            logger.info("User saved successfully with ID: {}", user.getId());
+            
+            // Create and save user profile
+            UserProfile userProfile = new UserProfile();
+            userProfile.setUser(user);
+            userProfile.setUserId(user.getId());
+            userProfile.setFirstName(registerRequest.getFirst_name());
+            userProfile.setLastName(registerRequest.getLast_name());
+            if (Objects.nonNull(registerRequest.getGender())) {
+                userProfile.setGender(UserProfile.Gender.valueOf(registerRequest.getGender().toUpperCase()));
+            }
+            // Set optional fields if provided
+            if (registerRequest.getMiddle_name() != null && !registerRequest.getMiddle_name().trim().isEmpty()) {
+                userProfile.setMiddleName(registerRequest.getMiddle_name());
             }
             
-            // Hash password and store user credentials
-            String hashedPassword = passwordEncoder.encode(registerRequest.getPassword());
-            userCredentials.put(registerRequest.getUsername(), hashedPassword);
+            if (registerRequest.getDob() != null) {
+                userProfile.setDob(LocalDate.parse(registerRequest.getDob()));
+            }
+            
+            if (registerRequest.getAbout() != null && !registerRequest.getAbout().trim().isEmpty()) {
+                userProfile.setAbout(registerRequest.getAbout());
+            }
+            
+            // Set location if provided
+            if (registerRequest.getState_id() != null) {
+                MasterState state = masterStateRepository.findById(registerRequest.getState_id())
+                        .orElseThrow(() -> new RuntimeException("Invalid state ID: " + registerRequest.getState_id()));
+                userProfile.setState(state);
+                
+                if (registerRequest.getDistrict_id() != null) {
+                    MasterDistrict district = masterDistrictRepository.findById(registerRequest.getDistrict_id())
+                            .orElseThrow(() -> new RuntimeException("Invalid district ID: " + registerRequest.getDistrict_id()));
+                    userProfile.setDistrict(district);
+                    
+                    if (registerRequest.getTahsil_id() != null) {
+                        MasterTahsil tahsil = masterTahsilRepository.findById(registerRequest.getTahsil_id())
+                                .orElseThrow(() -> new RuntimeException("Invalid tahsil ID: " + registerRequest.getTahsil_id()));
+                        userProfile.setTahsil(tahsil);
+                    }
+                }
+            }
+            
+            // Set profession if provided
+            if (registerRequest.getProfession_id() != null && !registerRequest.getProfession_id().trim().isEmpty()) {
+                try {
+                    Long professionId = Long.parseLong(registerRequest.getProfession_id());
+                    MasterProfession profession = masterProfessionRepository.findById(professionId)
+                            .orElseThrow(() -> new RuntimeException("Invalid profession ID"));
+                    userProfile.setProfession(profession);
+                } catch (NumberFormatException e) {
+                    throw new RuntimeException("Invalid profession ID format");
+                }
+            }
+            
+            if (registerRequest.getBusiness_description() != null && !registerRequest.getBusiness_description().trim().isEmpty()) {
+                userProfile.setBusinessDescription(registerRequest.getBusiness_description());
+            }
+            
+            logger.info("Saving user profile for user ID: {}", user.getId());
+            userProfileRepository.save(userProfile);
+//            user.setUserProfile(userProfile);
+//            user = userRepository.save(user);
+            logger.info("User profile saved successfully");
             
             // Create user info
-            AuthResponse.UserInfo userInfo = new AuthResponse.UserInfo(
-                1L, // In production, get from database
-                registerRequest.getUsername(),
-                registerRequest.getEmail(),
-                registerRequest.getFirstName(),
-                registerRequest.getLastName()
-            );
-            userInfo.setBio(registerRequest.getBio());
-            userInfo.setCommunityId(registerRequest.getCommunityId());
+            AuthResponse.UserInfo userInfo = createUserInfo(user, userProfile);
             
             // Generate JWT tokens
             String accessToken = generateAccessToken(userInfo);
@@ -115,12 +211,12 @@ public class AuthServiceImpl implements AuthService {
             // Store refresh token
             refreshTokens.put(refreshToken, userInfo.getUsername());
             
-            logger.info("Registration successful for user: {}", registerRequest.getUsername());
+            logger.info("Registration successful for user: {}", registerRequest.getEmail_id());
             
             return new AuthResponse(accessToken, refreshToken, "Bearer", jwtExpiration, userInfo);
             
         } catch (Exception e) {
-            logger.error("Registration failed for user: {}", registerRequest.getUsername(), e);
+            logger.error("Registration failed for user: {}", registerRequest.getEmail_id(), e);
             throw new RuntimeException("Registration failed: " + e.getMessage());
         }
     }
@@ -137,8 +233,14 @@ public class AuthServiceImpl implements AuthService {
             
             String username = refreshTokens.get(refreshToken);
             
+            // Find user
+            User user = userRepository.findByEmailIdOrMobileNo(username)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            
+            UserProfile userProfile = userProfileRepository.findByUserId(user.getId()).orElse(null);
+            
             // Create user info
-            AuthResponse.UserInfo userInfo = createUserInfo(username);
+            AuthResponse.UserInfo userInfo = createUserInfo(user, userProfile);
             
             // Generate new JWT tokens
             String newAccessToken = generateAccessToken(userInfo);
@@ -234,27 +336,23 @@ public class AuthServiceImpl implements AuthService {
                 .compact();
     }
     
-    private AuthResponse.UserInfo createUserInfo(String username) {
-        // In production, fetch from database
+    private AuthResponse.UserInfo createUserInfo(User user, UserProfile userProfile) {
         AuthResponse.UserInfo userInfo = new AuthResponse.UserInfo(
-            1L, // In production, get from database
-            username,
-            username + "@example.com", // In production, get from database
-            "Demo", // In production, get from database
-            "User"  // In production, get from database
+                user.getId(),
+                user.getEmailId(),
+                user.getEmailId(),
+                userProfile != null ? userProfile.getFirstName() : "User",
+                userProfile != null ? userProfile.getLastName() : "Name"
         );
-        userInfo.setBio("Demo user bio");
-        userInfo.setCommunityId(1L);
-        userInfo.setCommunityName("Demo Community");
-        return userInfo;
-    }
-    
-    private void initializeDemoUsers() {
-        // Add some demo users for testing
-        userCredentials.put("admin", passwordEncoder.encode("admin123"));
-        userCredentials.put("user1", passwordEncoder.encode("user123"));
-        userCredentials.put("user2", passwordEncoder.encode("user123"));
         
-        logger.info("Demo users initialized");
+        if (userProfile != null) {
+            userInfo.setBio(userProfile.getAbout());
+            if (userProfile.getState() != null) {
+                userInfo.setCommunityId(userProfile.getState().getId());
+                userInfo.setCommunityName(userProfile.getState().getStateName());
+            }
+        }
+        
+        return userInfo;
     }
 }

@@ -1,5 +1,6 @@
 package com.powar.dto;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -13,6 +14,7 @@ public class RegisterRequest {
     
     @NotBlank(message = "Email is required")
     @Email(message = "Email should be valid")
+    @JsonAlias("a")
     private String email_id;
     
     @NotBlank(message = "Mobile number is required")
@@ -21,6 +23,7 @@ public class RegisterRequest {
     
     @NotBlank(message = "Password is required")
     @Size(min = 6, message = "Password must be at least 6 characters")
+    @JsonAlias("password")
     private String password_hash;
     
     @NotBlank(message = "First name is required")
@@ -37,47 +40,28 @@ public class RegisterRequest {
     private Long tahsil_id;
     private String address_line;
     private String about;
-    private Long profession_id;
+    private String profession_id; // Changed to String to handle both string and numeric values
     private String business_description;
     private String username;
     private String bio;
     private String password;
     private Long communityId;
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
-    public String getFirstName() {
-        return firstName;
-    }
-
-    public void setFirstName(String firstName) {
-        this.firstName = firstName;
-    }
-
+    
+    // Getter for username (use email_id if username is not set)
     public String getUsername() {
-        return username;
+        return username != null ? username : email_id;
     }
-
+    
     public void setUsername(String username) {
         this.username = username;
     }
-
-    public String getLastName() {
-        return lastName;
-    }
-
-    public void setLastName(String lastName) {
-        this.lastName = lastName;
-    }
-
+    
+    // Additional fields for compatibility
+    @JsonAlias("email")
     private String email;
+    @JsonAlias("firstName")
     private String firstName;
+    @JsonAlias("lastName")
     private String lastName;
     
     // Default constructor
@@ -115,6 +99,15 @@ public class RegisterRequest {
     
     public void setPassword_hash(String password_hash) {
         this.password_hash = password_hash;
+    }
+    
+    // Alias getter for password field
+    public String getPassword() {
+        return password_hash;
+    }
+    
+    public void setPassword(String password) {
+        this.password_hash = password;
     }
     
     public String getFirst_name() {
@@ -197,11 +190,11 @@ public class RegisterRequest {
         this.about = about;
     }
     
-    public Long getProfession_id() {
+    public String getProfession_id() {
         return profession_id;
     }
     
-    public void setProfession_id(Long profession_id) {
+    public void setProfession_id(String profession_id) {
         this.profession_id = profession_id;
     }
     
@@ -211,6 +204,31 @@ public class RegisterRequest {
     
     public void setBusiness_description(String business_description) {
         this.business_description = business_description;
+    }
+    
+    // Additional getters and setters for compatibility fields
+    public String getEmail() {
+        return email;
+    }
+    
+    public void setEmail(String email) {
+        this.email = email;
+    }
+    
+    public String getFirstName() {
+        return firstName;
+    }
+    
+    public void setFirstName(String firstName) {
+        this.firstName = firstName;
+    }
+    
+    public String getLastName() {
+        return lastName;
+    }
+    
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
     }
     
     @Override

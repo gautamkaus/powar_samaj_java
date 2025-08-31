@@ -1,12 +1,21 @@
 package com.powar.controller;
 
-import com.powar.service.PythonApiClient;
+import com.powar.entity.MasterState;
+import com.powar.entity.MasterDistrict;
+import com.powar.entity.MasterTahsil;
+import com.powar.entity.MasterProfession;
+import com.powar.repository.MasterStateRepository;
+import com.powar.repository.MasterDistrictRepository;
+import com.powar.repository.MasterTahsilRepository;
+import com.powar.repository.MasterProfessionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -16,224 +25,217 @@ public class DataController {
     
     private static final Logger logger = LoggerFactory.getLogger(DataController.class);
     
-    private final PythonApiClient pythonApiClient;
+    private final MasterStateRepository masterStateRepository;
+    private final MasterDistrictRepository masterDistrictRepository;
+    private final MasterTahsilRepository masterTahsilRepository;
+    private final MasterProfessionRepository masterProfessionRepository;
     
     @Autowired
-    public DataController(PythonApiClient pythonApiClient) {
-        this.pythonApiClient = pythonApiClient;
+    public DataController(MasterStateRepository masterStateRepository,
+                         MasterDistrictRepository masterDistrictRepository,
+                         MasterTahsilRepository masterTahsilRepository,
+                         MasterProfessionRepository masterProfessionRepository) {
+        this.masterStateRepository = masterStateRepository;
+        this.masterDistrictRepository = masterDistrictRepository;
+        this.masterTahsilRepository = masterTahsilRepository;
+        this.masterProfessionRepository = masterProfessionRepository;
     }
     
     /**
-     * Get all members (fetched from Python API and formatted by Java)
+     * Test endpoint to verify security configuration
      */
-    @GetMapping("/members")
-    public ResponseEntity<Map<String, Object>> getAllMembers() {
+    @GetMapping("/test")
+    public ResponseEntity<Map<String, Object>> testEndpoint() {
+        logger.info("Test endpoint accessed");
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Test endpoint working");
+        response.put("source", "java-backend");
+        return ResponseEntity.ok(response);
+    }
+    
+    /**
+     * Health check endpoint
+     */
+    @GetMapping("/health")
+    public ResponseEntity<Map<String, Object>> healthCheck() {
+        logger.info("Health check endpoint accessed");
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", true);
+        response.put("message", "Data controller is healthy");
+        response.put("status", "UP");
+        response.put("source", "java-backend");
+        return ResponseEntity.ok(response);
+    }
+    
+    /**
+     * Get all states
+     */
+    @GetMapping("/states")
+    public ResponseEntity<Map<String, Object>> getAllStates() {
         try {
-            logger.info("Fetching all members through Java backend");
+            logger.info("Fetching all states");
             
-            Map<String, Object> membersData = pythonApiClient.getAllMembers();
+            List<MasterState> states = masterStateRepository.findAllByOrderByStateNameAsc();
             
-            if ((Boolean) membersData.get("success")) {
-                logger.info("Successfully retrieved and formatted members data");
-                return ResponseEntity.ok(membersData);
-            } else {
-                logger.error("Failed to retrieve members data: {}", membersData.get("message"));
-                return ResponseEntity.badRequest().body(membersData);
-            }
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "States fetched successfully");
+            response.put("data", states);
+            response.put("count", states.size());
+            response.put("source", "java-backend");
+            
+            logger.info("Successfully fetched {} states", states.size());
+            return ResponseEntity.ok(response);
             
         } catch (Exception e) {
-            logger.error("Error in members endpoint", e);
+            logger.error("Error fetching states", e);
             
-            Map<String, Object> errorResponse = Map.of(
-                "success", false,
-                "message", "Internal server error: " + e.getMessage(),
-                "source", "java-backend"
-            );
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", "Failed to fetch states: " + e.getMessage());
+            errorResponse.put("source", "java-backend");
             
-            return ResponseEntity.internalServerError().body(errorResponse);
+            return ResponseEntity.badRequest().body(errorResponse);
         }
     }
     
     /**
-     * Get member details by ID (fetched from Python API and formatted by Java)
+     * Get districts by state ID
      */
-    @GetMapping("/members/{memberId}")
-    public ResponseEntity<Map<String, Object>> getMemberDetails(@PathVariable Long memberId) {
+    @GetMapping("/states/{stateId}/districts")
+    public ResponseEntity<Map<String, Object>> getDistrictsByState(@PathVariable Long stateId) {
         try {
-            logger.info("Fetching member details for ID: {} through Java backend", memberId);
+            logger.info("Fetching districts for state ID: {}", stateId);
             
-            Map<String, Object> memberData = pythonApiClient.getMemberDetails(memberId);
+            List<MasterDistrict> districts = masterDistrictRepository.findByStateIdOrderByDistNameAsc(stateId);
             
-            if ((Boolean) memberData.get("success")) {
-                logger.info("Successfully retrieved and formatted member details for ID: {}", memberId);
-                return ResponseEntity.ok(memberData);
-            } else {
-                logger.error("Failed to retrieve member details: {}", memberData.get("message"));
-                return ResponseEntity.badRequest().body(memberData);
-            }
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Districts fetched successfully");
+            response.put("data", districts);
+            response.put("count", districts.size());
+            response.put("source", "java-backend");
+            
+            logger.info("Successfully fetched {} districts for state {}", districts.size(), stateId);
+            return ResponseEntity.ok(response);
             
         } catch (Exception e) {
-            logger.error("Error in member details endpoint", e);
+            logger.error("Error fetching districts for state {}", stateId, e);
             
-            Map<String, Object> errorResponse = Map.of(
-                "success", false,
-                "message", "Internal server error: " + e.getMessage(),
-                "source", "java-backend"
-            );
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", "Failed to fetch districts: " + e.getMessage());
+            errorResponse.put("source", "java-backend");
             
-            return ResponseEntity.internalServerError().body(errorResponse);
+            return ResponseEntity.badRequest().body(errorResponse);
         }
     }
     
     /**
-     * Get all blogs (fetched from Python API and formatted by Java)
+     * Get tahsils by district ID
      */
-    @GetMapping("/blogs")
-    public ResponseEntity<Map<String, Object>> getAllBlogs() {
+    @GetMapping("/districts/{districtId}/tahsils")
+    public ResponseEntity<Map<String, Object>> getTahsilsByDistrict(@PathVariable Long districtId) {
         try {
-            logger.info("Fetching all blogs through Java backend");
+            logger.info("Fetching tahsils for district ID: {}", districtId);
             
-            Map<String, Object> blogsData = pythonApiClient.getAllBlogs();
+            List<MasterTahsil> tahsils = masterTahsilRepository.findByDistrictIdOrderByTahsilNameAsc(districtId);
             
-            if ((Boolean) blogsData.get("success")) {
-                logger.info("Successfully retrieved and formatted blogs data");
-                return ResponseEntity.ok(blogsData);
-            } else {
-                logger.error("Failed to retrieve blogs data: {}", blogsData.get("message"));
-                return ResponseEntity.badRequest().body(blogsData);
-            }
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Tahsils fetched successfully");
+            response.put("data", tahsils);
+            response.put("count", tahsils.size());
+            response.put("source", "java-backend");
+            
+            logger.info("Successfully fetched {} tahsils for district {}", tahsils.size(), districtId);
+            return ResponseEntity.ok(response);
             
         } catch (Exception e) {
-            logger.error("Error in blogs endpoint", e);
+            logger.error("Error fetching tahsils for district {}", districtId, e);
             
-            Map<String, Object> errorResponse = Map.of(
-                "success", false,
-                "message", "Internal server error: " + e.getMessage(),
-                "source", "java-backend"
-            );
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", "Failed to fetch tahsils: " + e.getMessage());
+            errorResponse.put("source", "java-backend");
             
-            return ResponseEntity.internalServerError().body(errorResponse);
+            return ResponseEntity.badRequest().body(errorResponse);
         }
     }
     
     /**
-     * Get blog details by ID (fetched from Python API and formatted by Java)
+     * Get all professions
      */
-    @GetMapping("/blogs/{blogId}")
-    public ResponseEntity<Map<String, Object>> getBlogDetails(@PathVariable Long blogId) {
+    @GetMapping("/professions")
+    public ResponseEntity<Map<String, Object>> getAllProfessions() {
         try {
-            logger.info("Fetching blog details for ID: {} through Java backend", blogId);
+            logger.info("Fetching all professions");
             
-            Map<String, Object> blogData = pythonApiClient.getBlogDetails(blogId);
+            List<MasterProfession> professions = masterProfessionRepository.findAllByOrderByEmployeeTypeAsc();
             
-            if ((Boolean) blogData.get("success")) {
-                logger.info("Successfully retrieved and formatted blog details for ID: {}", blogId);
-                return ResponseEntity.ok(blogData);
-            } else {
-                logger.error("Failed to retrieve blog details: {}", blogData.get("message"));
-                return ResponseEntity.badRequest().body(blogData);
-            }
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Professions fetched successfully");
+            response.put("data", professions);
+            response.put("count", professions.size());
+            response.put("source", "java-backend");
+            
+            logger.info("Successfully fetched {} professions", professions.size());
+            return ResponseEntity.ok(response);
             
         } catch (Exception e) {
-            logger.error("Error in blog details endpoint", e);
+            logger.error("Error fetching professions", e);
             
-            Map<String, Object> errorResponse = Map.of(
-                "success", false,
-                "message", "Internal server error: " + e.getMessage(),
-                "source", "java-backend"
-            );
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", "Failed to fetch professions: " + e.getMessage());
+            errorResponse.put("source", "java-backend");
             
-            return ResponseEntity.internalServerError().body(errorResponse);
+            return ResponseEntity.badRequest().body(errorResponse);
         }
     }
     
     /**
-     * Get all communities (fetched from Python API and formatted by Java)
+     * Get complete location hierarchy
      */
-    @GetMapping("/communities")
-    public ResponseEntity<Map<String, Object>> getAllCommunities() {
+    @GetMapping("/location-hierarchy")
+    public ResponseEntity<Map<String, Object>> getLocationHierarchy() {
         try {
-            logger.info("Fetching all communities through Java backend");
+            logger.info("Fetching complete location hierarchy");
             
-            Map<String, Object> communitiesData = pythonApiClient.getAllCommunities();
+            List<MasterState> states = masterStateRepository.findAllByOrderByStateNameAsc();
             
-            if ((Boolean) communitiesData.get("success")) {
-                logger.info("Successfully retrieved and formatted communities data");
-                return ResponseEntity.ok(communitiesData);
-            } else {
-                logger.error("Failed to retrieve communities data: {}", communitiesData.get("message"));
-                return ResponseEntity.badRequest().body(communitiesData);
+            // Build hierarchy structure
+            for (MasterState state : states) {
+                List<MasterDistrict> districts = masterDistrictRepository.findByStateIdOrderByDistNameAsc(state.getId());
+                state.setDistricts(districts);
+                
+                for (MasterDistrict district : districts) {
+                    List<MasterTahsil> tahsils = masterTahsilRepository.findByDistrictIdOrderByTahsilNameAsc(district.getId());
+                    district.setTahsils(tahsils);
+                }
             }
             
-        } catch (Exception e) {
-            logger.error("Error in communities endpoint", e);
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Location hierarchy fetched successfully");
+            response.put("data", states);
+            response.put("count", states.size());
+            response.put("source", "java-backend");
             
-            Map<String, Object> errorResponse = Map.of(
-                "success", false,
-                "message", "Internal server error: " + e.getMessage(),
-                "source", "java-backend"
-            );
-            
-            return ResponseEntity.internalServerError().body(errorResponse);
-        }
-    }
-    
-    /**
-     * Get analytics data (fetched from Python API and formatted by Java)
-     */
-    @GetMapping("/analytics")
-    public ResponseEntity<Map<String, Object>> getAnalytics() {
-        try {
-            logger.info("Fetching analytics data through Java backend");
-            
-            Map<String, Object> analyticsData = pythonApiClient.getAnalytics();
-            
-            if ((Boolean) analyticsData.get("success")) {
-                logger.info("Successfully retrieved and formatted analytics data");
-                return ResponseEntity.ok(analyticsData);
-            } else {
-                logger.error("Failed to retrieve analytics data: {}", analyticsData.get("message"));
-                return ResponseEntity.badRequest().body(analyticsData);
-            }
+            logger.info("Successfully fetched location hierarchy with {} states", states.size());
+            return ResponseEntity.ok(response);
             
         } catch (Exception e) {
-            logger.error("Error in analytics endpoint", e);
+            logger.error("Error fetching location hierarchy", e);
             
-            Map<String, Object> errorResponse = Map.of(
-                "success", false,
-                "message", "Internal server error: " + e.getMessage(),
-                "source", "java-backend"
-            );
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", "Failed to fetch location hierarchy: " + e.getMessage());
+            errorResponse.put("source", "java-backend");
             
-            return ResponseEntity.internalServerError().body(errorResponse);
-        }
-    }
-    
-    /**
-     * Health check for Python API through Java backend
-     */
-    @GetMapping("/health/python")
-    public ResponseEntity<Map<String, Object>> checkPythonApiHealth() {
-        try {
-            logger.info("Checking Python API health through Java backend");
-            
-            return pythonApiClient.checkPythonApiHealth()
-                    .map(healthData -> {
-                        logger.info("Python API health check completed");
-                        return ResponseEntity.ok(healthData);
-                    })
-                    .block();
-                    
-        } catch (Exception e) {
-            logger.error("Error in Python API health check", e);
-            
-            Map<String, Object> errorResponse = Map.of(
-                "success", false,
-                "message", "Error checking Python API health: " + e.getMessage(),
-                "source", "java-backend"
-            );
-            
-            return ResponseEntity.internalServerError().body(errorResponse);
+            return ResponseEntity.badRequest().body(errorResponse);
         }
     }
 }

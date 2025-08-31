@@ -1,29 +1,45 @@
 server:
-  port: ${SERVER_PORT:8080}
+  port: ${SERVER_PORT:8081}
 
 spring:
   application:
     name: powar-java-backend
   
   datasource:
-    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:powar_db}?useSSL=false&serverTimezone=UTC
-    username: ${DB_USER:root}
-    password: ${DB_PASSWORD:}
+    url: jdbc:mysql://yugenixdb.c1uoq02kudcw.ap-south-1.rds.amazonaws.com:3306/yugenixdb?useSSL=false&serverTimezone=UTC&zeroDateTimeBehavior=convertToNull&allowPublicKeyRetrieval=true&useLegacyDatetimeCode=false&useUnicode=true&characterEncoding=utf8
+    username: admin
+    password: JAIe0zcenyBbGWisbAQf
     driver-class-name: com.mysql.cj.jdbc.Driver
+
   
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: false
+    show-sql: true
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.MySQL8Dialect
+        dialect: org.hibernate.dialect.MySQLDialect
         format_sql: true
+        jdbc:
+          time_zone: UTC
+        connection:
+          characterEncoding: utf8
+          useUnicode: true
+        # Force Hibernate to use exact table names as specified in @Table annotations
+        globally_quoted_identifiers: true
+        globally_quoted_identifiers_skip_column_definitions: true
+        # Use physical naming strategy to respect @Table annotations
+        naming:
+          physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
+        hbm2ddl:
+          auto: none
+    database-platform: org.hibernate.dialect.MySQLDialect
 
   security:
-    user:
-      name: admin
-      password: admin
+    # Disable default security user configuration
+    # user:
+    #   name: admin
+    #   password: admin
 
 # Python API Configuration
 python:
@@ -37,7 +53,7 @@ python:
 
 # JWT Configuration
 jwt:
-  secret: ${JWT_SECRET:powarSecretKey123456789012345678901234567890}
+  secret: ${JWT_SECRET:eyJhbGciOiJIUzUxMiJ9InN1cGVyc2VjcmV0a2V5Zm9ycG93YXJzYW1hamJhY2tlbmR0aGF0aXNhdGxlYXN0NjRjaGFyYWN0ZXJzbG9uZ2Zvcmh1NTEyYml0c2FsZ29yaXRobX0}
   expiration: ${JWT_EXPIRATION:86400000} # 24 hours in milliseconds
 
 # Logging
