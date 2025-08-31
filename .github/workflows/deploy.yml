@@ -65,18 +65,19 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Build and push Docker image
-        env:
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          cd powar_samaj_java
-          docker build -t ${{ env.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE }}:$IMAGE_TAG .
-          docker build -t ${{ env.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE }}:latest .
-          docker push ${{ env.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE }}:$IMAGE_TAG
-          docker push ${{ env.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE }}:latest
-          echo "image=${{ env.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE }}:$IMAGE_TAG" >> $GITHUB_OUTPUT
-
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+      - name: Build and push
+        id: docker_build
+        uses: docker/build-push-action@v2
+        with:
+          context: ./
+          file: ./Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/pawar_samaj_java:latest
+      - name: Image digest
+        run: echo ${{ steps.docker_build.outputs.digest }}
   # Deploy to EC2 (Free Tier Optimized)
   deploy-to-ec2:
     needs: build-and-push
