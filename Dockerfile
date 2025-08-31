@@ -1,6 +1,6 @@
 # Multi-stage build for Java Backend
 # Stage 1: Build the application
-FROM maven:3.9.5-openjdk-17 AS build
+FROM maven:3.9.5-eclipse-temurin-17 AS build
 
 # Set working directory
 WORKDIR /app
@@ -13,7 +13,7 @@ COPY src ./src
 RUN mvn clean package -DskipTests
 
 # Stage 2: Runtime stage
-FROM openjdk:17-jre-slim
+FROM eclipse-temurin:17-jre-alpine
 
 # Add Maintainer Info
 LABEL maintainer="kaustubh@yugenix.in"
@@ -24,8 +24,8 @@ WORKDIR /app
 # Copy the built JAR from build stage
 COPY --from=build /app/target/powar-java-backend-1.0.0.jar app.jar
 
-# Create non-root user for security
-RUN groupadd -r appuser && useradd -r -g appuser appuser
+# Create non-root user for security (Alpine Linux approach)
+RUN addgroup -g 1001 appuser && adduser -D -s /bin/sh -u 1001 -G appuser appuser
 USER appuser
 
 # Expose port
