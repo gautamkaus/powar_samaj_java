@@ -53,33 +53,34 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            # Create deployment dir
-            mkdir -p ~/powar-samaj
-            cd ~/powar-samaj
-            
-            # Pull latest image
-            docker pull ${{ secrets.DOCKER_USERNAME }}/powar-samaj-java:latest
-            
-            # Stop old container
-            docker stop powar-samaj-java || true
-            docker rm powar-samaj-java || true
-            
-            # Remove unused images
-            docker image prune -f
-            
-            # Run new container
-            docker run -d \
-              --name powar-samaj-java \
-              --restart unless-stopped \
-              -p 8081:8081 \
-              --memory=512m \
-              --cpus=0.5 \
-              -e SPRING_PROFILES_ACTIVE=prod \
-              -e DB_HOST=${{ secrets.DB_HOST }} \
-              -e DB_PORT=${{ secrets.DB_PORT }} \
-              -e DB_NAME=${{ secrets.DB_NAME }} \
-              -e DB_USERNAME=${{ secrets.DB_USERNAME }} \
-              -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
-              -e JWT_SECRET=${{ secrets.JWT_SECRET }} \
-              -e SERVER_PORT=8081 \
-              ${{ secrets.DOCKER_USERNAME }}/powar-samaj-java:latest
+            echo "✅ Connected to EC2 successfully"
+#            # Create deployment dir
+#            mkdir -p ~/powar-samaj
+#            cd ~/powar-samaj
+#
+#            # Pull latest image
+#            docker pull ${{ secrets.DOCKER_USERNAME }}/powar-samaj-java:latest
+#
+#            # Stop old container
+#            docker stop powar-samaj-java || true
+#            docker rm powar-samaj-java || true
+#
+#            # Remove unused images
+#            docker image prune -f
+#
+#            # Run new container
+#            docker run -d \
+#              --name powar-samaj-java \
+#              --restart unless-stopped \
+#              -p 8081:8081 \
+#              --memory=512m \
+#              --cpus=0.5 \
+#              -e SPRING_PROFILES_ACTIVE=prod \
+#              -e DB_HOST=${{ secrets.DB_HOST }} \
+#              -e DB_PORT=${{ secrets.DB_PORT }} \
+#              -e DB_NAME=${{ secrets.DB_NAME }} \
+#              -e DB_USERNAME=${{ secrets.DB_USERNAME }} \
+#              -e DB_PASSWORD=${{ secrets.DB_PASSWORD }} \
+#              -e JWT_SECRET=${{ secrets.JWT_SECRET }} \
+#              -e SERVER_PORT=8081 \
+#              ${{ secrets.DOCKER_USERNAME }}/powar-samaj-java:latest
