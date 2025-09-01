@@ -14,43 +14,6 @@ env:
   DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
 
 jobs:
-  # Build and Test Job
-  # build-and-test:
-  #   runs-on: ubuntu-latest
-    
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v4
-
-  #     - name: Set up JDK 17
-  #       uses: actions/setup-java@v4
-  #       with:
-  #         java-version: '17'
-  #         distribution: 'temurin'
-
-      # - name: Cache Maven packages
-        # uses: actions/cache@v3
-        # with:
-          # path: ~/.m2
-          # key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          # restore-keys: ${{ runner.os }}-m2
-
-      # - name: Build with Maven
-      #   run: |
-      #     cd powar_samaj_java
-      #     mvn clean package -DskipTests
-
-      # - name: Run tests (optional)
-      #   run: |
-      #     cd powar_samaj_java
-      #     mvn test
-
-      # - name: Upload build artifacts
-      #   uses: actions/upload-artifact@v3
-      #   with:
-      #     name: java-app
-      #     path: powar_samaj_java/target/*.jar
-
   # Build and Push Docker Image to Docker Hub
   build-and-push:
     runs-on: ubuntu-latest
@@ -60,24 +23,24 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Set up Docker Buildx
-        id: buildx
-        uses: docker/setup-buildx-action@v1
-      - name: Build and push
-        id: docker_build
-        uses: docker/build-push-action@v2
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
         with:
-          context: ./
-          file: ./Dockerfile
+          context: .
           push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/pawar_samaj_java:latest
-      - name: Image digest
-        run: echo ${{ steps.docker_build.outputs.digest }}
+          tags: ${{ env.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE }}:latest-
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   # Deploy to EC2 (Free Tier Optimized)
   deploy-to-ec2:
     needs: build-and-push
@@ -91,6 +54,9 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          timeout: 30s
+          command_timeout: 10m
           script: |
             # Update system packages (minimal for free tier)
             sudo apt-get update -qq
