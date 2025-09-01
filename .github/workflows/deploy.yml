@@ -37,9 +37,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ env.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE }}:latest-
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ env.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE }}:latest
 
   # Deploy to EC2 (Free Tier Optimized)
   deploy-to-ec2:
@@ -104,35 +102,6 @@ jobs:
               -e JWT_SECRET=${{ secrets.JWT_SECRET }} \
               -e SERVER_PORT=8081 \
               ${{ env.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE }}:latest
-            
-            # Health check
-            echo "Waiting for application to start..."
-            sleep 15
-            
-            # Check if container is running
-            if docker ps | grep -q powar-samaj-java; then
-              echo "Container is running successfully"
-            
-              # Health check with retry
-              for i in {1..5}; do
-                if curl -f http://localhost:8081/actuator/health > /dev/null 2>&1; then
-                  echo "✅ Application health check passed!"
-                  break
-                else
-                  echo "Health check attempt $i failed, retrying..."
-                  sleep 5
-                fi
-              done
-            
-              # Show container status
-              docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-            else
-              echo "❌ Container failed to start"
-              docker logs powar-samaj-java
-              exit 1
-            fi
-            
-            echo "Deployment completed successfully!"
 
       - name: Notify deployment status
         if: always()
