@@ -47,11 +47,12 @@ jobs:
     
     steps:
       - name: Deploy to EC2
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.KNOWN_SSH_KEY }}
+          password: ${{ secrets.AWS_PASSWORD }}
+#          key: ${{ secrets.KNOWN_SSH_KEY }}
           script: |
             echo "✅ Connected to EC2 successfully"
 #            # Create deployment dir
