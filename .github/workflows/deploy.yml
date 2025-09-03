@@ -65,8 +65,15 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-
-
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./
+          file: ./Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/powar-samaj-java:latest
+      - name: Image digest
+        run: echo ${{ steps.docker_build.outputs.digest }}
 
   # Deploy to EC2 (Free Tier Optimized)
   deploy-to-ec2:
