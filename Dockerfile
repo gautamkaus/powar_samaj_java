@@ -26,6 +26,7 @@ WORKDIR /app
 
 # Copy the built JAR from build stage
 COPY --from=build /app/target/powar-java-backend-1.0.0.jar app.jar
+COPY certs/keystore.p12 /app/certs/keystore.p12
 
 # Create non-root user for security (Alpine Linux approach)
 RUN addgroup -g 1001 appuser && adduser -D -s /bin/sh -u 1001 -G appuser appuser
