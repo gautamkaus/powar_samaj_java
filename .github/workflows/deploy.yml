@@ -126,6 +126,7 @@ jobs:
               --name powar-samaj-java \
               --restart unless-stopped \
               -p 8081:8081 \
+              -v /home/ubuntu/certs/keystore.p12:/app/certs/keystore.p12 \
               --memory=512m \
               --cpus=0.5 \
               -e SPRING_PROFILES_ACTIVE=prod \
