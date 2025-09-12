@@ -35,14 +35,14 @@ public class MasterState {
     @Convert(converter = ZeroDateTimeConverter.class)
     private LocalDateTime updatedAt;
     
-    // Relationships
-    @OneToMany(mappedBy = "state", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @JsonManagedReference("state-districts")
-    private List<MasterDistrict> districts = new ArrayList<>();
-    
-    @OneToMany(mappedBy = "state", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @JsonManagedReference("state-profiles")
-    private List<UserProfile> userProfiles = new ArrayList<>();
+//    // Relationships
+//    @OneToMany(mappedBy = "state", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+//    @JsonManagedReference("state-districts")
+//    private List<MasterDistrict> districts = new ArrayList<>();
+//
+//    @OneToMany(mappedBy = "state", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+//    @JsonManagedReference("state-profiles")
+//    private List<UserProfile> userProfiles = new ArrayList<>();
     
     // Constructors
     public MasterState() {}
@@ -82,22 +82,6 @@ public class MasterState {
     
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
-    }
-    
-    public List<MasterDistrict> getDistricts() {
-        return districts;
-    }
-    
-    public void setDistricts(List<MasterDistrict> districts) {
-        this.districts = districts;
-    }
-    
-    public List<UserProfile> getUserProfiles() {
-        return userProfiles;
-    }
-    
-    public void setUserProfiles(List<UserProfile> userProfiles) {
-        this.userProfiles = userProfiles;
     }
     
     @Override

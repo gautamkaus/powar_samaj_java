@@ -8,6 +8,7 @@ import com.powar.repository.MasterStateRepository;
 import com.powar.repository.MasterDistrictRepository;
 import com.powar.repository.MasterTahsilRepository;
 import com.powar.repository.MasterProfessionRepository;
+import com.powar.service.GeoService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +30,8 @@ public class DataController {
     private final MasterDistrictRepository masterDistrictRepository;
     private final MasterTahsilRepository masterTahsilRepository;
     private final MasterProfessionRepository masterProfessionRepository;
+    @Autowired
+    private GeoService geoService;
     
     @Autowired
     public DataController(MasterStateRepository masterStateRepository,
@@ -72,32 +75,9 @@ public class DataController {
      * Get all states
      */
     @GetMapping("/states")
-    public ResponseEntity<Map<String, Object>> getAllStates() {
-        try {
+    public List<MasterState> getAllStates() {
             logger.info("Fetching all states");
-            
-            List<MasterState> states = masterStateRepository.findAllByOrderByStateNameAsc();
-            
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "States fetched successfully");
-            response.put("data", states);
-            response.put("count", states.size());
-            response.put("source", "java-backend");
-            
-            logger.info("Successfully fetched {} states", states.size());
-            return ResponseEntity.ok(response);
-            
-        } catch (Exception e) {
-            logger.error("Error fetching states", e);
-            
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("success", false);
-            errorResponse.put("message", "Failed to fetch states: " + e.getMessage());
-            errorResponse.put("source", "java-backend");
-            
-            return ResponseEntity.badRequest().body(errorResponse);
-        }
+            return geoService.getMasterState();
     }
     
     /**
@@ -207,7 +187,7 @@ public class DataController {
             List<MasterState> states = masterStateRepository.findAllByOrderByStateNameAsc();
             
             // Build hierarchy structure
-            for (MasterState state : states) {
+           /* for (MasterState state : states) {
                 List<MasterDistrict> districts = masterDistrictRepository.findByStateIdOrderByDistNameAsc(state.getId());
                 state.setDistricts(districts);
                 
@@ -215,7 +195,7 @@ public class DataController {
                     List<MasterTahsil> tahsils = masterTahsilRepository.findByDistrictIdOrderByTahsilNameAsc(district.getId());
                     district.setTahsils(tahsils);
                 }
-            }
+            }*/
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
